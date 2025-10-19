@@ -5,7 +5,6 @@ References:
 - [github: Spec Kit](https://github.com/github/spec-kit)
 - [github: 保哥 Spec Kit 翻譯](https://github.com/doggy8088/spec-kit)
 - [多奇教育: SDD with Spec Kit](https://learn.duotify.com/courses/sdd)
--
 
 ---
 
@@ -59,5 +58,11 @@ References:
 ## START
 
 1. 在專案根目錄初始化 Spec Kit 專案範本 `specify init --ai copilot --script ps --here`
-2. 建立一個 `AGENTS.md` 檔案 (給 Copilot CLI 看的)
+2. 建立一個 `AGENTS.md` 檔案 (給 Copilot CLI 看的), 內容: We're going to be using slash command from `.github\prompts\`
 3. `git add AGENTS.md && git commit -m "Add AGENTS.md"`
+4. 更新 Copilot CLI 到最新版 `npm i -g @github/copilot`
+5. 查看 Copilot CLI 版本 `copilot -v`
+6. 啟動 GitHub Copilot CLI 互動式環境 `copilot --allow-all-tools`
+7. 制定憲法 (也可以使用 `#file` 來讀取指定檔案)
+    - `/speckit.constitution Create principles focused on code quality, testing standards, user experience consistency, and performance requirements`
+    - `/speckit.constitution All specifications, plans, and user-facing documentation MUST be written in Traditional Chinese (zh-TW)`

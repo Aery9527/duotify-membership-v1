@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: Duotify Membership API - 會員註冊與驗證
+  description: |
+    會員註冊與 E-Mail 驗證 API 規格
+    
+    **功能概述**：
+    - 使用者註冊：透過身分證字號、姓名、E-Mail、密碼建立帳號
+    - E-Mail 驗證：使用 6 位數驗證碼完成帳號啟用
+    - 驗證碼重發：支援重新寄送驗證碼（每小時限制 3 次）
+    
+    **安全機制**：
+    - 驗證碼錯誤 3 次後帳號鎖定 10 分鐘
+    - 驗證碼有效期限 5 分鐘
+    - 併發註冊保護（身分證字號唯一性）
+  version: 1.0.0
+  contact:
+    name: Duotify Development Team
+servers:
+  - url: http://localhost:8080/api/v1
+    description: 本地開發環境
+  - url: https://api-staging.duotify.com/api/v1
+    description: 測試環境
+  - url: https://api.duotify.com/api/v1
+    description: 生產環境
+
+tags:
+  - name: registration
+    description: 會員註冊相關操作
+  - name: verification
+    description: E-Mail 驗證相關操作
+
+paths:
+  /members/register:
+    post:
+      tags:
+        - registration
+      summary: 註冊新會員
+      description: |
+        建立新會員帳號，系統會自動寄送 6 位數驗證碼至註冊的 E-Mail 信箱。
+        
+        **驗證規則**：
+        - 身分證字號：1 碼英文 + 9 碼數字，含檢查碼驗證
+        - 姓名：僅允許中文或英文字母，不可包含空格或符號
+        - 密碼：8-20 碼，必須包含英文大小寫與數字
+        - E-Mail：符合 RFC 5322 標準格式
+        
+        **錯誤情境**：
+        - 身分證字號已註冊：回傳 409 Conflict
+        - 輸入驗證失敗：回傳 400 Bad Request
+      operationId: registerMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              valid:
+                summary: 有效的註冊請求
+                value:
+                  national_id: "A123456789"
+                  name: "王小明"
+                  email: "wang@example.com"
+                  password: "SecurePass123"
+      responses:
+        '201':
+          description: 註冊成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+              examples:
+                success:
+                  summary: 註冊成功
+                  value:
+                    success: true
+                    data:
+                      member_id: "123e4567-e89b-12d3-a456-426614174000"
+                      email: "wang@example.com"
+                      is_verified: false
+                      message: "註冊成功，請至信箱收取驗證碼"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: 身分證字號已註冊
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                duplicateNationalId:
+                  summary: 身分證字號重複
+                  value:
+                    success: false
+                    error:
+                      code: "NATIONAL_ID_EXISTS"
+                      message: "此身分證字號已註冊"
+                      details:
+                        field: "national_id"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /members/verify:
+    post:
+      tags:
+        - verification
+      summary: 驗證 E-Mail
+      description: |
+        使用 6 位數驗證碼完成 E-Mail 驗證並啟用帳號。
+        
+        **驗證規則**：
+        - 驗證碼必須為 6 位數字
+        - 驗證碼有效期限 5 分鐘
+        - 錯誤嘗試 3 次後帳號鎖定 10 分鐘
+        
+        **成功後效果**：
+        - 帳號狀態更新為已驗證
+        - 解除所有功能限制
+        - 無需重新登入
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+            examples:
+              valid:
+                summary: 有效的驗證請求
+                value:
+                  member_id: "123e4567-e89b-12d3-a456-426614174000"
+                  code: "123456"
+      responses:
+        '200':
+          description: 驗證成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+              examples:
+                success:
+                  summary: 驗證成功
+                  value:
+                    success: true
+                    data:
+                      member_id: "123e4567-e89b-12d3-a456-426614174000"
+                      is_verified: true
+                      message: "驗證成功"
+        '400':
+          description: 驗證碼錯誤或已過期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                incorrectCode:
+                  summary: 驗證碼錯誤
+                  value:
+                    success: false
+                    error:
+                      code: "INVALID_CODE"
+                      message: "驗證碼錯誤"
+                      details:
+                        attempts_remaining: 2
+                expiredCode:
+                  summary: 驗證碼已過期
+                  value:
+                    success: false
+                    error:
+                      code: "CODE_EXPIRED"
+                      message: "驗證碼已過期"
+        '403':
+          description: 帳號已鎖定
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                accountLocked:
+                  summary: 帳號鎖定
+                  value:
+                    success: false
+                    error:
+                      code: "ACCOUNT_LOCKED"
+                      message: "錯誤次數過多，帳號已暫時鎖定 10 分鐘"
+                      details:
+                        locked_until: "2025-10-19T11:05:00Z"
+        '404':
+          description: 會員不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                memberNotFound:
+                  summary: 會員不存在
+                  value:
+                    success: false
+                    error:
+                      code: "MEMBER_NOT_FOUND"
+                      message: "會員不存在"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /members/verify/resend:
+    post:
+      tags:
+        - verification
+      summary: 重新寄送驗證碼
+      description: |
+        重新產生並寄送新的 6 位數驗證碼。
+        
+        **限制規則**：
+        - 每小時最多重發 3 次
+        - 重發時舊驗證碼立即失效
+        - 新驗證碼有效期限 5 分鐘
+        
+        **適用情境**：
+        - 未收到驗證碼
+        - 驗證碼已過期
+        - 驗證碼遺失
+      operationId: resendVerificationCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendRequest'
+            examples:
+              valid:
+                summary: 有效的重發請求
+                value:
+                  member_id: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '200':
+          description: 重發成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResendResponse'
+              examples:
+                success:
+                  summary: 重發成功
+                  value:
+                    success: true
+                    data:
+                      member_id: "123e4567-e89b-12d3-a456-426614174000"
+                      message: "驗證碼已重新寄送至您的信箱"
+        '404':
+          description: 會員不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                memberNotFound:
+                  summary: 會員不存在
+                  value:
+                    success: false
+                    error:
+                      code: "MEMBER_NOT_FOUND"
+                      message: "會員不存在"
+        '429':
+          description: 重發次數超過限制
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rateLimitExceeded:
+                  summary: 超過重發限制
+                  value:
+                    success: false
+                    error:
+                      code: "RESEND_LIMIT_EXCEEDED"
+                      message: "重發次數已達上限，請稍後再試"
+                      details:
+                        retry_after_seconds: 1800
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - national_id
+        - name
+        - email
+        - password
+      properties:
+        national_id:
+          type: string
+          pattern: '^[A-Z][0-9]{9}$'
+          description: 台灣身分證字號（1 碼英文 + 9 碼數字）
+          example: "A123456789"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: '^[\u4e00-\u9fa5a-zA-Z]+$'
+          description: 姓名（僅中文或英文字母）
+          example: "王小明"
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: E-Mail 地址
+          example: "wang@example.com"
+        password:
+          type: string
+          minLength: 8
+          maxLength: 20
+          description: 密碼（8-20 碼，含英文大小寫與數字）
+          example: "SecurePass123"
+
+    RegisterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            member_id:
+              type: string
+              format: uuid
+              description: 會員唯一識別碼
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            email:
+              type: string
+              format: email
+              example: "wang@example.com"
+            is_verified:
+              type: boolean
+              description: E-Mail 驗證狀態
+              example: false
+            message:
+              type: string
+              example: "註冊成功，請至信箱收取驗證碼"
+
+    VerifyRequest:
+      type: object
+      required:
+        - member_id
+        - code
+      properties:
+        member_id:
+          type: string
+          format: uuid
+          description: 會員唯一識別碼
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+          description: 6 位數驗證碼
+          example: "123456"
+
+    VerifyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            member_id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            is_verified:
+              type: boolean
+              description: E-Mail 驗證狀態
+              example: true
+            message:
+              type: string
+              example: "驗證成功"
+
+    ResendRequest:
+      type: object
+      required:
+        - member_id
+      properties:
+        member_id:
+          type: string
+          format: uuid
+          description: 會員唯一識別碼
+          example: "123e4567-e89b-12d3-a456-426614174000"
+
+    ResendResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            member_id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            message:
+              type: string
+              example: "驗證碼已重新寄送至您的信箱"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: 錯誤代碼
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              description: 錯誤訊息（繁體中文）
+              example: "輸入驗證失敗"
+            details:
+              type: object
+              description: 詳細錯誤資訊
+              additionalProperties: true
+
+    ValidationError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              example: "輸入驗證失敗"
+            details:
+              type: object
+              properties:
+                fields:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      field:
+                        type: string
+                        example: "national_id"
+                      message:
+                        type: string
+                        example: "身分證字號格式錯誤"
+
+  responses:
+    ValidationError:
+      description: 輸入驗證錯誤
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          examples:
+            nationalIdInvalid:
+              summary: 身分證字號格式錯誤
+              value:
+                success: false
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "輸入驗證失敗"
+                  details:
+                    fields:
+                      - field: "national_id"
+                        message: "身分證字號格式錯誤"
+            nameInvalid:
+              summary: 姓名格式錯誤
+              value:
+                success: false
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "輸入驗證失敗"
+                  details:
+                    fields:
+                      - field: "name"
+                        message: "姓名只能包含中文或英文字母"
+            passwordWeak:
+              summary: 密碼強度不足
+              value:
+                success: false
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "輸入驗證失敗"
+                  details:
+                    fields:
+                      - field: "password"
+                        message: "密碼必須包含英文大小寫與數字"
+
+    InternalServerError:
+      description: 伺服器內部錯誤
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            serverError:
+              summary: 伺服器錯誤
+              value:
+                success: false
+                error:
+                  code: "INTERNAL_SERVER_ERROR"
+                  message: "伺服器發生錯誤，請稍後再試"
+                  details:
+                    request_id: "req-123456789"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT 認證（登入後使用）
+
+# 註：此 API 為公開端點，不需要認證
+# 未來若需要保護 resend 端點可加上 security 設定

@@ -72,3 +72,7 @@ References:
 9. *Spec Kit Step 3*: 釐清規格 `/speckit.clarify`
     - 這步是讓 AI 根據 [spec.md](specs/001-member-registration/spec.md) 內容釐清模糊的部分, 就像 SA 在需求訪談一樣
     - AI 會有初步的選項讓你選擇, 也可以自己輸入問題答案, 可以多次執行該指令釐清需求問題
+10. *Spec Kit Step 4*: 制定開發計畫 `/speckit.plan @tech.md`
+11. *Spec Kit Step 5*: 規劃任務清單 `/speckit.tasks`
+12. *Spec Kit Step 6*: 產生規格分析報告 `/speckit.analyze Save your analyze report to analyze-01.md`
+13. *Spec Kit Step 7*: 開始實作 `/speckit.implement`

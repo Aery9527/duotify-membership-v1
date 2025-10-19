@@ -63,6 +63,12 @@ References:
 4. 更新 Copilot CLI 到最新版 `npm i -g @github/copilot`
 5. 查看 Copilot CLI 版本 `copilot -v`
 6. 啟動 GitHub Copilot CLI 互動式環境 `copilot --allow-all-tools`
-7. 制定憲法 (也可以使用 `#file` 來讀取指定檔案)
+7. *Spec Kit Step 1*: 制定憲法 (也可以指定檔案讀取內容)
     - `/speckit.constitution Create principles focused on code quality, testing standards, user experience consistency, and performance requirements`
     - `/speckit.constitution All specifications, plans, and user-facing documentation MUST be written in Traditional Chinese (zh-TW)`
+8. *Spec Kit Step 2*: 制定規格 `/speckit.specify PRD.md`, 會讀取 PRD.md 內容理解 **User Story**
+    - 隨時可以再次執行修正, 支援差異更新
+    - 這步驟會自動 fork branch, 然後根據 prd 建立規格 [spec.md](specs/001-member-registration/spec.md)
+9. *Spec Kit Step 3*: 釐清規格 `/speckit.clarify`
+    - 這步是讓 AI 根據 [spec.md](specs/001-member-registration/spec.md) 內容釐清模糊的部分, 就像 SA 在需求訪談一樣
+    - AI 會有初步的選項讓你選擇, 也可以自己輸入問題答案, 可以多次執行該指令釐清需求問題
